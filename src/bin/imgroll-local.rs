@@ -25,7 +25,7 @@ fn main() -> Result<()> {
                 let mut stdin = stdin_.lock();
                 stdin.read_to_end(&mut buf).context(InputOutput {})?;
             }
-            let photo = imgroll::process_photo(&buf).context(Image {})?;
+            let (photo, files) = imgroll::process_photo(&buf, "stdin").context(Image {})?;
             println!("{}", serde_json::to_string(&photo).context(JsonEnc {})?);
         }
         paths => {
@@ -33,7 +33,7 @@ fn main() -> Result<()> {
                 let mut file = fs::File::open(path).context(InputOutput {})?;
                 let mut buf = Vec::new();
                 file.read_to_end(&mut buf).context(InputOutput {})?;
-                let photo = imgroll::process_photo(&buf).context(Image {})?;
+                let (photo, files) = imgroll::process_photo(&buf, path).context(Image {})?;
                 println!("{}", serde_json::to_string(&photo).context(JsonEnc {})?);
             }
         }
@@ -41,3 +41,5 @@ fn main() -> Result<()> {
 
     Ok(())
 }
+
+

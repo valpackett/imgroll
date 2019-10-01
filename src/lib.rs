@@ -54,15 +54,16 @@ pub struct Photo {
     pub iso: Option<i32>,
 }
 
-pub fn process_photo(file_contents: &[u8]) -> Result<Photo> {
+pub fn process_photo(
+    file_contents: &[u8],
+    file_name: &str,
+) -> Result<(Photo, HashMap<String, Vec<u8>>)> {
     use image::GenericImageView;
     let meta = rexiv2::Metadata::new_from_buffer(&file_contents).context(MetadataParse {})?;
+    let exivfmt = meta.get_media_type().context(MetadataParse {})?;
     let imag = orient_image(
-        image::load_from_memory_with_format(
-            &file_contents,
-            format_exiv2image(meta.get_media_type().context(MetadataParse {})?)?,
-        )
-        .context(ImageProc {})?,
+        image::load_from_memory_with_format(&file_contents, format_exiv2image(&exivfmt)?)
+            .context(ImageProc {})?,
         meta.get_orientation(),
     );
     let palette = color_thief::get_palette(
@@ -74,37 +75,83 @@ pub fn process_photo(file_contents: &[u8]) -> Result<Photo> {
     .context(PaletteExtract {})?;
     let (width, height) = imag.dimensions();
 
+    let mut files = HashMap::new();
     let mut source = Vec::new();
 
-    Ok(Photo {
-        tiny_preview: make_tiny_preview(&imag)?,
-        source,
-        width,
-        height,
-        palette,
-        geo: meta.get_gps_info().map(
-            |rexiv2::GpsInfo {
-                 latitude,
-                 longitude,
-                 altitude,
-             }| GeoLocation {
-                latitude,
-                longitude,
-                altitude,
-            },
-        ),
-        aperture: meta.get_fnumber(),
-        shutter_speed: meta.get_exposure_time(),
-        focal_length: meta.get_focal_length(),
-        iso: meta.get_iso_speed(),
-    })
+    let file_prefix = format!(
+        "{}_{}",
+        hex::encode(&tiny_keccak::shake128(&imag.raw_pixels())[0..6]),
+        slug::slugify(basename(&file_name))
+    );
+
+    source.push(Source {
+        original: true,
+        src: file_name.to_owned(),
+        r#type: format_exiv2mime(&exivfmt)?.to_owned(),
+    });
+
+    let webp_file = format!("{}.webp", file_prefix);
+    let webp = webp::encode(imag.clone(), webp::Quality::Lossy(0.6)).context(WebpEncode {})?;
+    files.insert(webp_file.clone(), {
+        let mut v = Vec::new();
+        v.extend_from_slice(webp.as_slice());
+        v
+    });
+    source.push(Source {
+        original: false,
+        src: webp_file,
+        r#type: "image/webp".to_owned(),
+    });
+
+
+    Ok((
+        Photo {
+            tiny_preview: make_tiny_preview(&imag)?,
+            source,
+            width,
+            height,
+            palette,
+            geo: meta.get_gps_info().map(
+                |rexiv2::GpsInfo {
+                     latitude,
+                     longitude,
+                     altitude,
+                 }| GeoLocation {
+                    latitude,
+                    longitude,
+                    altitude,
+                },
+            ),
+            aperture: meta.get_fnumber(),
+            shutter_speed: meta.get_exposure_time(),
+            focal_length: meta.get_focal_length(),
+            iso: meta.get_iso_speed(),
+        },
+        files,
+    ))
 }
 
-fn format_exiv2image(mt: rexiv2::MediaType) -> Result<image::ImageFormat> {
+fn format_exiv2image(mt: &rexiv2::MediaType) -> Result<image::ImageFormat> {
     match mt {
         rexiv2::MediaType::Jpeg => Ok(image::ImageFormat::JPEG),
         rexiv2::MediaType::Png => Ok(image::ImageFormat::PNG),
-        f => Err(Error::UnsupportedFormat { format: f }),
+        f => Err(Error::UnsupportedFormat { format: f.clone() }),
+    }
+}
+
+fn format_exiv2ext(mt: &rexiv2::MediaType) -> Result<&'static str> {
+    match mt {
+        rexiv2::MediaType::Jpeg => Ok("jpg"),
+        rexiv2::MediaType::Png => Ok("png"),
+        f => Err(Error::UnsupportedFormat { format: f.clone() }),
+    }
+}
+
+fn format_exiv2mime(mt: &rexiv2::MediaType) -> Result<&'static str> {
+    match mt {
+        rexiv2::MediaType::Jpeg => Ok("image/jpeg"),
+        rexiv2::MediaType::Png => Ok("image/png"),
+        f => Err(Error::UnsupportedFormat { format: f.clone() }),
     }
 }
 
@@ -137,4 +184,22 @@ pub fn make_tiny_preview(imag: &image::DynamicImage) -> Result<String> {
         "data:image/webp;base64,{}",
         base64::encode(webp.as_slice())
     ))
+}
+
+fn basename(path: &str) -> String {
+    let mut pieces = path.rsplit('/');
+    let mut parts = match pieces.next() {
+        Some(p) => p,
+        None => path,
+    }
+    .split('.');
+    match parts.next() {
+        Some(p) => p.into(),
+        None => path.into(),
+    }
+}
+
+fn encode_webp(imag: &image::DynamicImage, prefix: &str) -> Result<(Source, Vec<u8>)> {
+    let name = format!("{}.webp", prefix);
+    let webp = webp::encode(imag.clone(), webp::Quality::Lossy(0.6)).context(WebpEncode {})?;
 }
