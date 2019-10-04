@@ -1,5 +1,5 @@
 use snafu::{ResultExt, Snafu};
-use std::{env, fs, io, io::Read};
+use std::{collections::HashMap, env, fs, io, io::Read};
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -25,16 +25,14 @@ fn main() -> Result<()> {
                 let mut stdin = stdin_.lock();
                 stdin.read_to_end(&mut buf).context(InputOutput {})?;
             }
-            let (photo, files) = imgroll::process_photo(&buf, "stdin").context(Image {})?;
-            println!("{}", serde_json::to_string(&photo).context(JsonEnc {})?);
+            output(imgroll::process_photo(&buf, "stdin").context(Image {})?)?;
         }
         paths => {
             for path in paths {
                 let mut file = fs::File::open(path).context(InputOutput {})?;
                 let mut buf = Vec::new();
                 file.read_to_end(&mut buf).context(InputOutput {})?;
-                let (photo, files) = imgroll::process_photo(&buf, path).context(Image {})?;
-                println!("{}", serde_json::to_string(&photo).context(JsonEnc {})?);
+                output(imgroll::process_photo(&buf, path).context(Image {})?)?;
             }
         }
     }
@@ -42,4 +40,12 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-
+fn output((photo, files): (imgroll::Photo, HashMap<String, Vec<u8>>)) -> Result<()> {
+    println!("{}", serde_json::to_string(&photo).context(JsonEnc {})?);
+    for (path, bytes) in files {
+        use std::io::Write;
+        let mut file = fs::File::create(path).context(InputOutput {})?;
+        file.write_all(&bytes).context(InputOutput {})?;
+    }
+    Ok(())
+}

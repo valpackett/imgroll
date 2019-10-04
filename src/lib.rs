@@ -1,7 +1,10 @@
 mod webp;
 
 use snafu::{ResultExt, Snafu};
-use std::{collections::HashMap, ptr, slice};
+use std::{collections::HashMap, convert::TryInto, ptr, slice};
+
+const PNG_QUANTIZE_COLORS: usize = 69;
+const WEBP_QUALITY: f32 = 0.69;
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -22,6 +25,12 @@ pub enum Error {
 
     #[snafu(display("Could not encode webp: {}", source))]
     WebpEncode { source: webp::Error },
+
+    #[snafu(display("Could not encode png: {}", source))]
+    PngEncode { source: lodepng::Error },
+
+    #[snafu(display("Could not fit size value into type: {}", source))]
+    ConvertInt { source: std::num::TryFromIntError },
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -90,19 +99,13 @@ pub fn process_photo(
         r#type: format_exiv2mime(&exivfmt)?.to_owned(),
     });
 
-    let webp_file = format!("{}.webp", file_prefix);
-    let webp = webp::encode(imag.clone(), webp::Quality::Lossy(0.6)).context(WebpEncode {})?;
-    files.insert(webp_file.clone(), {
-        let mut v = Vec::new();
-        v.extend_from_slice(webp.as_slice());
-        v
-    });
-    source.push(Source {
-        original: false,
-        src: webp_file,
-        r#type: "image/webp".to_owned(),
-    });
+    let (src, bytes) = encode_webp(&imag, &file_prefix)?;
+    files.insert(src.src.clone(), bytes);
+    source.push(src);
 
+    let (src, bytes) = encode_png(&imag, &file_prefix)?;
+    files.insert(src.src.clone(), bytes);
+    source.push(src);
 
     Ok((
         Photo {
@@ -135,14 +138,6 @@ fn format_exiv2image(mt: &rexiv2::MediaType) -> Result<image::ImageFormat> {
     match mt {
         rexiv2::MediaType::Jpeg => Ok(image::ImageFormat::JPEG),
         rexiv2::MediaType::Png => Ok(image::ImageFormat::PNG),
-        f => Err(Error::UnsupportedFormat { format: f.clone() }),
-    }
-}
-
-fn format_exiv2ext(mt: &rexiv2::MediaType) -> Result<&'static str> {
-    match mt {
-        rexiv2::MediaType::Jpeg => Ok("jpg"),
-        rexiv2::MediaType::Png => Ok("png"),
         f => Err(Error::UnsupportedFormat { format: f.clone() }),
     }
 }
@@ -201,5 +196,94 @@ fn basename(path: &str) -> String {
 
 fn encode_webp(imag: &image::DynamicImage, prefix: &str) -> Result<(Source, Vec<u8>)> {
     let name = format!("{}.webp", prefix);
-    let webp = webp::encode(imag.clone(), webp::Quality::Lossy(0.6)).context(WebpEncode {})?;
+    let webp =
+        webp::encode(imag.clone(), webp::Quality::Lossy(WEBP_QUALITY)).context(WebpEncode {})?;
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(webp.as_slice());
+    Ok((
+        Source {
+            original: false,
+            src: name,
+            r#type: "image/webp".to_owned(),
+        },
+        bytes,
+    ))
+}
+
+fn encode_png(imag: &image::DynamicImage, prefix: &str) -> Result<(Source, Vec<u8>)> {
+    use exoquant::{convert_to_indexed, ditherer, optimizer, Color};
+    use image::{GenericImageView, Pixel};
+    let name = format!("{}.png", prefix);
+    let pixels = imag
+        .pixels()
+        .map(|(_, _, p)| {
+            let cols = p.channels();
+            Color::new(cols[0], cols[1], cols[2], cols[3])
+        })
+        .collect::<Vec<_>>();
+    let width = imag.width().try_into().context(ConvertInt {})?;
+    let height = imag.height().try_into().context(ConvertInt {})?;
+    let (palette, indexed_pixels) = convert_to_indexed(
+        &pixels,
+        width,
+        PNG_QUANTIZE_COLORS,
+        &optimizer::KMeans,
+        &ditherer::FloydSteinberg::checkered(),
+    );
+    let mut state = lodepng::State::new();
+    unsafe {
+        state.set_custom_zlib(Some(compress_zopfli), ptr::null());
+    }
+    for color in palette {
+        let rgba = rgb::RGBA::new(color.r, color.g, color.b, color.a);
+        state
+            .info_png_mut()
+            .color
+            .palette_add(rgba)
+            .context(PngEncode {})?;
+        state
+            .info_raw_mut()
+            .palette_add(rgba)
+            .context(PngEncode {})?;
+    }
+    state.info_png_mut().color.set_bitdepth(8);
+    state.info_png_mut().color.colortype = lodepng::ColorType::PALETTE;
+    state.info_raw_mut().set_bitdepth(8);
+    state.info_raw_mut().colortype = lodepng::ColorType::PALETTE;
+    let bytes = state
+        .encode(&indexed_pixels, width, height)
+        .context(PngEncode {})?;
+    Ok((
+        Source {
+            original: false,
+            src: name,
+            r#type: "image/png".to_owned(),
+        },
+        bytes,
+    ))
+}
+
+unsafe extern "C" fn compress_zopfli(
+    result: &mut *mut libc::c_uchar,
+    outsize: &mut usize,
+    input: *const libc::c_uchar,
+    insize: usize,
+    _settings: *const lodepng::CompressSettings,
+) -> libc::c_uint {
+    // Would be nice to use a Write impl for a C buffer but whatever
+    let in_slice = slice::from_raw_parts(input as *const _, insize);
+    let mut bytes = Vec::new();
+    if let Err(_) = zopfli::compress(
+        &zopfli::Options::default(),
+        &zopfli::Format::Zlib,
+        in_slice,
+        &mut bytes,
+    ) {
+        return 69;
+    }
+    *outsize = bytes.len();
+    *result = libc::malloc(*outsize) as *mut _;
+    let out_slice = slice::from_raw_parts_mut(*result, *outsize);
+    out_slice.copy_from_slice(&bytes);
+    0
 }
