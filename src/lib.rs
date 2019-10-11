@@ -43,9 +43,15 @@ pub struct GeoLocation {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct SrcSetEntry {
+    pub src: String,
+    pub width: u32,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Source {
     pub original: bool,
-    pub src: String,
+    pub srcset: Vec<SrcSetEntry>,
     pub r#type: String,
 }
 
@@ -95,17 +101,48 @@ pub fn process_photo(
 
     source.push(Source {
         original: true,
-        src: file_name.to_owned(),
+        srcset: vec![ SrcSetEntry { src: file_name.to_owned(), width: width } ],
         r#type: format_exiv2mime(&exivfmt)?.to_owned(),
     });
 
-    let (src, bytes) = encode_webp(&imag, &file_prefix)?;
-    files.insert(src.src.clone(), bytes);
-    source.push(src);
+    // Always constrain the size of the main processed image
+    let (imag, width) = if width > 3000 || height > 3000 {
+        let i = imag.resize(3000, 3000, image::FilterType::Lanczos3);
+        let w = i.width();
+        (i, w)
+    } else { (imag, width) };
 
-    let (src, bytes) = encode_png(&imag, &file_prefix)?;
-    files.insert(src.src.clone(), bytes);
-    source.push(src);
+    for encoder in encoders_for_format(&exivfmt)? {
+        let main_result = encoder(&imag)?;
+        let main_filename = format!("{}.{}.{}", file_prefix, width, main_result.file_ext);
+        files.insert(main_filename.clone(), main_result.bytes);
+        let mut srcset = vec![
+            SrcSetEntry { src: main_filename, width }
+        ];
+
+        let mut make_thumbnail = |size| {
+            let thumb = imag.resize(size, size, image::FilterType::Lanczos3);
+            let result = encoder(&thumb)?;
+            let filename = format!("{}.{}.{}", file_prefix, thumb.width(), result.file_ext);
+            files.insert(filename.clone(), result.bytes);
+            srcset.push(SrcSetEntry { src: filename, width: thumb.width() });
+            Ok(())
+        };
+
+        if width > 2500 {
+            make_thumbnail(2000)?;
+        }
+
+        if width > 1500 {
+            make_thumbnail(1000)?;
+        }
+
+        source.push(Source {
+            original: false,
+            srcset,
+            r#type: main_result.mime_type.to_owned(),
+        });
+    }
 
     Ok((
         Photo {
@@ -146,6 +183,14 @@ fn format_exiv2mime(mt: &rexiv2::MediaType) -> Result<&'static str> {
     match mt {
         rexiv2::MediaType::Jpeg => Ok("image/jpeg"),
         rexiv2::MediaType::Png => Ok("image/png"),
+        f => Err(Error::UnsupportedFormat { format: f.clone() }),
+    }
+}
+
+fn encoders_for_format(mt: &rexiv2::MediaType) -> Result<&'static [Encoder]> {
+    match mt {
+        rexiv2::MediaType::Jpeg => Ok(&[encode_webp]),
+        rexiv2::MediaType::Png => Ok(&[encode_png]),
         f => Err(Error::UnsupportedFormat { format: f.clone() }),
     }
 }
@@ -194,26 +239,25 @@ fn basename(path: &str) -> String {
     }
 }
 
-fn encode_webp(imag: &image::DynamicImage, prefix: &str) -> Result<(Source, Vec<u8>)> {
-    let name = format!("{}.webp", prefix);
+type Encoder = fn(&image::DynamicImage) -> Result<EncodedImg>;
+
+struct EncodedImg {
+    bytes: Vec<u8>,
+    mime_type: &'static str,
+    file_ext: &'static str,
+}
+
+fn encode_webp(imag: &image::DynamicImage) -> Result<EncodedImg> {
     let webp =
         webp::encode(imag.clone(), webp::Quality::Lossy(WEBP_QUALITY)).context(WebpEncode {})?;
     let mut bytes = Vec::new();
     bytes.extend_from_slice(webp.as_slice());
-    Ok((
-        Source {
-            original: false,
-            src: name,
-            r#type: "image/webp".to_owned(),
-        },
-        bytes,
-    ))
+    Ok(EncodedImg { bytes, mime_type: "image/webp", file_ext: "webp" })
 }
 
-fn encode_png(imag: &image::DynamicImage, prefix: &str) -> Result<(Source, Vec<u8>)> {
+fn encode_png(imag: &image::DynamicImage) -> Result<EncodedImg> {
     use exoquant::{convert_to_indexed, ditherer, optimizer, Color};
     use image::{GenericImageView, Pixel};
-    let name = format!("{}.png", prefix);
     let pixels = imag
         .pixels()
         .map(|(_, _, p)| {
@@ -253,14 +297,7 @@ fn encode_png(imag: &image::DynamicImage, prefix: &str) -> Result<(Source, Vec<u
     let bytes = state
         .encode(&indexed_pixels, width, height)
         .context(PngEncode {})?;
-    Ok((
-        Source {
-            original: false,
-            src: name,
-            r#type: "image/png".to_owned(),
-        },
-        bytes,
-    ))
+    Ok(EncodedImg { bytes, mime_type: "image/png", file_ext: "png" })
 }
 
 unsafe extern "C" fn compress_zopfli(
