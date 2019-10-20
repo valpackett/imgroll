@@ -105,8 +105,10 @@ pub fn process_photo(
         r#type: format_exiv2mime(&exivfmt)?.to_owned(),
     });
 
+    let lossless = format_is_lossless(&exivfmt);
+
     // Always constrain the size of the main processed image
-    let (imag, width) = if width > 3000 || height > 3000 {
+    let (imag, width) = if !lossless && (width > 3000 || height > 3000) {
         let i = imag.resize(3000, 3000, image::FilterType::Lanczos3);
         let w = i.width();
         (i, w)
@@ -129,11 +131,11 @@ pub fn process_photo(
             Ok(())
         };
 
-        if width > 2500 {
+        if !lossless && width > 2500 {
             make_thumbnail(2000)?;
         }
 
-        if width > 1500 {
+        if !lossless && width > 1500 {
             make_thumbnail(1000)?;
         }
 
@@ -184,6 +186,13 @@ fn format_exiv2mime(mt: &rexiv2::MediaType) -> Result<&'static str> {
         rexiv2::MediaType::Jpeg => Ok("image/jpeg"),
         rexiv2::MediaType::Png => Ok("image/png"),
         f => Err(Error::UnsupportedFormat { format: f.clone() }),
+    }
+}
+
+fn format_is_lossless(mt: &rexiv2::MediaType) -> bool {
+    match mt {
+        rexiv2::MediaType::Png => true,
+        f => false,
     }
 }
 
