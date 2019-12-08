@@ -1,7 +1,7 @@
 mod webp;
 
 use snafu::{ResultExt, Snafu};
-use std::{collections::HashMap, convert::TryInto, ptr, slice};
+use std::{convert::TryInto, ptr, slice};
 
 const PNG_QUANTIZE_COLORS: usize = 69;
 const WEBP_QUALITY: f32 = 53.0;
@@ -73,7 +73,13 @@ pub struct Photo {
     pub iso: Option<i32>,
 }
 
-pub fn process_photo(file_contents: &[u8], file_name: &str) -> Result<(Photo, HashMap<String, Vec<u8>>)> {
+pub struct OutFile {
+    pub name: String,
+    pub bytes: Vec<u8>,
+    pub mimetype: String,
+}
+
+pub fn process_photo(file_contents: &[u8], file_name: &str) -> Result<(Photo, Vec<OutFile>)> {
     use image::GenericImageView;
     let meta = rexiv2::Metadata::new_from_buffer(&file_contents).context(MetadataParse {})?;
     let exivfmt = meta.get_media_type().context(MetadataParse {})?;
@@ -110,23 +116,32 @@ pub fn process_photo(file_contents: &[u8], file_name: &str) -> Result<(Photo, Ha
     };
 
     use rayon::prelude::*;
-    let (mut source, files_pairs): (Vec<_>, Vec<_>) = encoders_for_format(&exivfmt)?
+    let (mut source, files): (Vec<_>, Vec<_>) = encoders_for_format(&exivfmt)?
         .par_iter()
         .map(|encoder| {
             let main_result = encoder(&imag)?;
             let main_filename = format!("{}.{}.{}", file_prefix, width, main_result.file_ext);
             let mut files = vec![];
-            files.push((main_filename.clone(), main_result.bytes));
+            files.push(OutFile {
+                name: main_filename.clone(),
+                bytes: main_result.bytes,
+                mimetype: main_result.mime_type.to_owned(),
+            });
             let mut srcset = vec![SrcSetEntry {
                 src: main_filename,
                 width,
             }];
 
+            let mimetype = main_result.mime_type.to_owned();
             let mut make_thumbnail = |size| {
                 let thumb = imag.resize(size, size, image::FilterType::Lanczos3);
                 let result = encoder(&thumb)?;
                 let filename = format!("{}.{}.{}", file_prefix, thumb.width(), result.file_ext);
-                files.push((filename.clone(), result.bytes));
+                files.push(OutFile {
+                    name: filename.clone(),
+                    bytes: result.bytes,
+                    mimetype: mimetype.clone(),
+                });
                 srcset.push(SrcSetEntry {
                     src: filename,
                     width: thumb.width(),
@@ -164,11 +179,6 @@ pub fn process_photo(file_contents: &[u8], file_name: &str) -> Result<(Photo, Ha
         r#type: format_exiv2mime(&exivfmt)?.to_owned(),
     });
 
-    let mut files = HashMap::new();
-    for p in files_pairs.into_iter() {
-        files.extend(p);
-    }
-
     Ok((
         Photo {
             tiny_preview: make_tiny_preview(&imag)?,
@@ -192,7 +202,7 @@ pub fn process_photo(file_contents: &[u8], file_name: &str) -> Result<(Photo, Ha
             focal_length: meta.get_focal_length(),
             iso: meta.get_iso_speed(),
         },
-        files,
+        files.into_iter().flatten().collect(),
     ))
 }
 

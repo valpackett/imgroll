@@ -94,16 +94,18 @@ fn handle_event(event: Value, _ctx: lambda::Context) -> Result<(), HandlerError>
         }
         info!("Processed photo, metadata: {:?}", &photo);
         let json = serde_json::to_string(&photo).context(JsonEnc {})?;
-        for (path, bytes) in files {
-            info!("Uploading file '{}'", &path);
+        for imgroll::OutFile { name, bytes, mimetype } in files {
+            info!("Uploading file '{}'", &name);
             let mut file_meta = HashMap::new();
-            file_meta.insert("imgroll-original".to_string(), key.clone());
+            file_meta.insert("imgroll-original".to_owned(), key.clone());
             clnt.put_object(PutObjectRequest {
                 bucket: bucket.clone(),
-                key: path,
-                acl: Some("public-read".to_string()),
+                key: name,
+                acl: Some("public-read".to_owned()),
                 metadata: Some(file_meta),
                 content_length: Some(bytes.len().try_into().context(FromInt {})?),
+                content_type: Some(mimetype),
+                content_disposition: Some("inline".to_owned()),
                 body: Some(StreamingBody::from(bytes)),
                 ..Default::default()
             })
