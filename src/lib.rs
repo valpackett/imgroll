@@ -95,7 +95,7 @@ pub fn process_photo(
 
     let file_prefix = format!(
         "{}_{}",
-        hex::encode(&tiny_keccak::shake128(&imag.raw_pixels())[0..6]),
+        hex::encode(&tiny_keccak::shake128(&imag.raw_pixels())[0..8]),
         slug::slugify(basename(&file_name))
     );
 
@@ -192,7 +192,7 @@ fn format_exiv2mime(mt: &rexiv2::MediaType) -> Result<&'static str> {
 fn format_is_lossless(mt: &rexiv2::MediaType) -> bool {
     match mt {
         rexiv2::MediaType::Png => true,
-        f => false,
+        _f => false,
     }
 }
 
