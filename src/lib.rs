@@ -85,9 +85,6 @@ pub fn process_photo(file_contents: &[u8], file_name: &str) -> Result<(Photo, Ha
         .context(PaletteExtract {})?;
     let (width, height) = imag.dimensions();
 
-    let mut files = HashMap::new();
-    let mut source = Vec::new();
-
     let file_prefix = format!(
         "{}_{}",
         {
@@ -101,15 +98,6 @@ pub fn process_photo(file_contents: &[u8], file_name: &str) -> Result<(Photo, Ha
         slug::slugify(basename(&file_name))
     );
 
-    source.push(Source {
-        original: true,
-        srcset: vec![SrcSetEntry {
-            src: file_name.to_owned(),
-            width: width,
-        }],
-        r#type: format_exiv2mime(&exivfmt)?.to_owned(),
-    });
-
     let lossless = format_is_lossless(&exivfmt);
 
     // Always constrain the size of the main processed image
@@ -121,40 +109,64 @@ pub fn process_photo(file_contents: &[u8], file_name: &str) -> Result<(Photo, Ha
         (imag, width)
     };
 
-    for encoder in encoders_for_format(&exivfmt)? {
-        let main_result = encoder(&imag)?;
-        let main_filename = format!("{}.{}.{}", file_prefix, width, main_result.file_ext);
-        files.insert(main_filename.clone(), main_result.bytes);
-        let mut srcset = vec![SrcSetEntry {
-            src: main_filename,
-            width,
-        }];
+    use rayon::prelude::*;
+    let (mut source, files_pairs): (Vec<_>, Vec<_>) = encoders_for_format(&exivfmt)?
+        .par_iter()
+        .map(|encoder| {
+            let main_result = encoder(&imag)?;
+            let main_filename = format!("{}.{}.{}", file_prefix, width, main_result.file_ext);
+            let mut files = vec![];
+            files.push((main_filename.clone(), main_result.bytes));
+            let mut srcset = vec![SrcSetEntry {
+                src: main_filename,
+                width,
+            }];
 
-        let mut make_thumbnail = |size| {
-            let thumb = imag.resize(size, size, image::FilterType::Lanczos3);
-            let result = encoder(&thumb)?;
-            let filename = format!("{}.{}.{}", file_prefix, thumb.width(), result.file_ext);
-            files.insert(filename.clone(), result.bytes);
-            srcset.push(SrcSetEntry {
-                src: filename,
-                width: thumb.width(),
-            });
-            Ok(())
-        };
+            let mut make_thumbnail = |size| {
+                let thumb = imag.resize(size, size, image::FilterType::Lanczos3);
+                let result = encoder(&thumb)?;
+                let filename = format!("{}.{}.{}", file_prefix, thumb.width(), result.file_ext);
+                files.push((filename.clone(), result.bytes));
+                srcset.push(SrcSetEntry {
+                    src: filename,
+                    width: thumb.width(),
+                });
+                Ok(())
+            };
 
-        if !lossless && width > 2500 {
-            make_thumbnail(2000)?;
-        }
+            if !lossless && width > 2500 {
+                make_thumbnail(2000)?;
+            }
 
-        if !lossless && width > 1500 {
-            make_thumbnail(1000)?;
-        }
+            if !lossless && width > 1500 {
+                make_thumbnail(1000)?;
+            }
 
-        source.push(Source {
-            original: false,
-            srcset,
-            r#type: main_result.mime_type.to_owned(),
-        });
+            Ok((
+                Source {
+                    original: false,
+                    srcset,
+                    r#type: main_result.mime_type.to_owned(),
+                },
+                files,
+            ))
+        })
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .unzip();
+
+    source.push(Source {
+        original: true,
+        srcset: vec![SrcSetEntry {
+            src: file_name.to_owned(),
+            width: width,
+        }],
+        r#type: format_exiv2mime(&exivfmt)?.to_owned(),
+    });
+
+    let mut files = HashMap::new();
+    for p in files_pairs.into_iter() {
+        files.extend(p);
     }
 
     Ok((
