@@ -86,7 +86,14 @@ pub fn process_photo(file_contents: &[u8], file_name: &str) -> Result<(Photo, Ha
 
     let file_prefix = format!(
         "{}_{}",
-        hex::encode(&tiny_keccak::shake128(&imag.raw_pixels())[0..8]),
+        {
+            use tiny_keccak::Hasher;
+            let mut hasher = tiny_keccak::ParallelHash::v128(&[], 8192);
+            hasher.update(&imag.raw_pixels());
+            let mut buf = [0u8; 16];
+            hasher.finalize(&mut buf);
+            hex::encode(&buf[0..6])
+        },
         slug::slugify(basename(&file_name))
     );
 
