@@ -4,7 +4,8 @@ use snafu::{ResultExt, Snafu};
 use std::{collections::HashMap, convert::TryInto, ptr, slice};
 
 const PNG_QUANTIZE_COLORS: usize = 69;
-const WEBP_QUALITY: f32 = 0.69;
+const WEBP_QUALITY: f32 = 53.0;
+const JPEG_QUALITY: f32 = 65.0;
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -28,6 +29,9 @@ pub enum Error {
 
     #[snafu(display("Could not encode png: {}", source))]
     PngEncode { source: lodepng::Error },
+
+    #[snafu(display("Could not encode jpeg"))]
+    JpegEncode {},
 
     #[snafu(display("Could not fit size value into type: {}", source))]
     ConvertInt { source: std::num::TryFromIntError },
@@ -205,7 +209,7 @@ fn format_is_lossless(mt: &rexiv2::MediaType) -> bool {
 
 fn encoders_for_format(mt: &rexiv2::MediaType) -> Result<&'static [Encoder]> {
     match mt {
-        rexiv2::MediaType::Jpeg => Ok(&[encode_webp]),
+        rexiv2::MediaType::Jpeg => Ok(&[encode_jpeg, encode_webp]),
         rexiv2::MediaType::Png => Ok(&[encode_png]),
         f => Err(Error::UnsupportedFormat { format: f.clone() }),
     }
@@ -260,8 +264,15 @@ struct EncodedImg {
     file_ext: &'static str,
 }
 
+// Big images can have less "quality": see "Compressive Images"
+fn quality_bonus(imag: &image::DynamicImage) -> f32 {
+    use image::GenericImageView;
+    (5000.0 - f32::max(imag.width() as f32, 4900.0)) * 0.001
+}
+
 fn encode_webp(imag: &image::DynamicImage) -> Result<EncodedImg> {
-    let webp = webp::encode(imag.clone(), webp::Quality::Lossy(WEBP_QUALITY)).context(WebpEncode {})?;
+    let webp =
+        webp::encode(imag.clone(), webp::Quality::Lossy(WEBP_QUALITY + quality_bonus(imag))).context(WebpEncode {})?;
     let mut bytes = Vec::new();
     bytes.extend_from_slice(webp.as_slice());
     Ok(EncodedImg {
@@ -269,6 +280,36 @@ fn encode_webp(imag: &image::DynamicImage) -> Result<EncodedImg> {
         mime_type: "image/webp",
         file_ext: "webp",
     })
+}
+
+fn encode_jpeg(imag: &image::DynamicImage) -> Result<EncodedImg> {
+    use image::GenericImageView;
+    let mut jpeg = mozjpeg::Compress::new(match imag.color() {
+        image::ColorType::RGB(8) => mozjpeg::ColorSpace::JCS_RGB,
+        image::ColorType::RGBA(8) => mozjpeg::ColorSpace::JCS_EXT_RGBA,
+        f => return Err(Error::UnsupportedColor { format: f }),
+    });
+    jpeg.set_scan_optimization_mode(mozjpeg::ScanMode::AllComponentsTogether);
+    jpeg.set_size(imag.width() as usize, imag.height() as usize);
+    jpeg.set_quality(JPEG_QUALITY + quality_bonus(imag));
+    jpeg.set_mem_dest();
+
+    jpeg.start_compress();
+    let samp = match imag.color() {
+        image::ColorType::RGB(8) => imag.to_rgb().into_flat_samples(),
+        image::ColorType::RGBA(8) => imag.to_rgba().into_flat_samples(),
+        f => return Err(Error::UnsupportedColor { format: f }),
+    };
+    jpeg.write_scanlines(&samp.as_slice());
+    jpeg.finish_compress();
+
+    jpeg.data_to_vec()
+        .map(|bytes| EncodedImg {
+            bytes,
+            mime_type: "image/jpeg",
+            file_ext: "jpg",
+        })
+        .map_err(|_| Error::JpegEncode {})
 }
 
 fn encode_png(imag: &image::DynamicImage) -> Result<EncodedImg> {
