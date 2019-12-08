@@ -1,6 +1,4 @@
-use og_libwebp_sys::{
-    WebPEncodeLosslessRGB, WebPEncodeLosslessRGBA, WebPEncodeRGB, WebPEncodeRGBA, WebPFree,
-};
+use og_libwebp_sys::{WebPEncodeLosslessRGB, WebPEncodeLosslessRGBA, WebPEncodeRGB, WebPEncodeRGBA, WebPFree};
 use snafu::{ResultExt, Snafu};
 use std::{convert::TryInto, ptr, slice};
 
@@ -61,12 +59,8 @@ pub fn encode(imag: image::DynamicImage, quality: Quality) -> Result<WebPOinter>
     let s = rowstride.try_into().context(ConvertSigned {})?;
     let ret = unsafe {
         match (imag.color(), quality) {
-            (image::ColorType::RGB(8), Lossy(q)) => {
-                WebPEncodeRGB(&samp.as_slice()[0], w, h, s, q, &mut result.ptr)
-            }
-            (image::ColorType::RGBA(8), Lossy(q)) => {
-                WebPEncodeRGBA(&samp.as_slice()[0], w, h, s, q, &mut result.ptr)
-            }
+            (image::ColorType::RGB(8), Lossy(q)) => WebPEncodeRGB(&samp.as_slice()[0], w, h, s, q, &mut result.ptr),
+            (image::ColorType::RGBA(8), Lossy(q)) => WebPEncodeRGBA(&samp.as_slice()[0], w, h, s, q, &mut result.ptr),
             (image::ColorType::RGB(8), Lossless) => {
                 WebPEncodeLosslessRGB(&samp.as_slice()[0], w, h, s, &mut result.ptr)
             }

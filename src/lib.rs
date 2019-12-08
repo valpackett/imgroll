@@ -69,25 +69,16 @@ pub struct Photo {
     pub iso: Option<i32>,
 }
 
-pub fn process_photo(
-    file_contents: &[u8],
-    file_name: &str,
-) -> Result<(Photo, HashMap<String, Vec<u8>>)> {
+pub fn process_photo(file_contents: &[u8], file_name: &str) -> Result<(Photo, HashMap<String, Vec<u8>>)> {
     use image::GenericImageView;
     let meta = rexiv2::Metadata::new_from_buffer(&file_contents).context(MetadataParse {})?;
     let exivfmt = meta.get_media_type().context(MetadataParse {})?;
     let imag = orient_image(
-        image::load_from_memory_with_format(&file_contents, format_exiv2image(&exivfmt)?)
-            .context(ImageProc {})?,
+        image::load_from_memory_with_format(&file_contents, format_exiv2image(&exivfmt)?).context(ImageProc {})?,
         meta.get_orientation(),
     );
-    let palette = color_thief::get_palette(
-        &imag.raw_pixels(),
-        colortype_image2thief(imag.color())?,
-        10,
-        10,
-    )
-    .context(PaletteExtract {})?;
+    let palette = color_thief::get_palette(&imag.raw_pixels(), colortype_image2thief(imag.color())?, 10, 10)
+        .context(PaletteExtract {})?;
     let (width, height) = imag.dimensions();
 
     let mut files = HashMap::new();
@@ -101,7 +92,10 @@ pub fn process_photo(
 
     source.push(Source {
         original: true,
-        srcset: vec![ SrcSetEntry { src: file_name.to_owned(), width: width } ],
+        srcset: vec![SrcSetEntry {
+            src: file_name.to_owned(),
+            width: width,
+        }],
         r#type: format_exiv2mime(&exivfmt)?.to_owned(),
     });
 
@@ -112,22 +106,28 @@ pub fn process_photo(
         let i = imag.resize(3000, 3000, image::FilterType::Lanczos3);
         let w = i.width();
         (i, w)
-    } else { (imag, width) };
+    } else {
+        (imag, width)
+    };
 
     for encoder in encoders_for_format(&exivfmt)? {
         let main_result = encoder(&imag)?;
         let main_filename = format!("{}.{}.{}", file_prefix, width, main_result.file_ext);
         files.insert(main_filename.clone(), main_result.bytes);
-        let mut srcset = vec![
-            SrcSetEntry { src: main_filename, width }
-        ];
+        let mut srcset = vec![SrcSetEntry {
+            src: main_filename,
+            width,
+        }];
 
         let mut make_thumbnail = |size| {
             let thumb = imag.resize(size, size, image::FilterType::Lanczos3);
             let result = encoder(&thumb)?;
             let filename = format!("{}.{}.{}", file_prefix, thumb.width(), result.file_ext);
             files.insert(filename.clone(), result.bytes);
-            srcset.push(SrcSetEntry { src: filename, width: thumb.width() });
+            srcset.push(SrcSetEntry {
+                src: filename,
+                width: thumb.width(),
+            });
             Ok(())
         };
 
@@ -229,10 +229,7 @@ fn colortype_image2thief(t: image::ColorType) -> Result<color_thief::ColorFormat
 pub fn make_tiny_preview(imag: &image::DynamicImage) -> Result<String> {
     let thumb = imag.resize(48, 48, image::FilterType::Gaussian);
     let webp = webp::encode(thumb, webp::Quality::Lossy(0.2)).context(WebpEncode {})?;
-    Ok(format!(
-        "data:image/webp;base64,{}",
-        base64::encode(webp.as_slice())
-    ))
+    Ok(format!("data:image/webp;base64,{}", base64::encode(webp.as_slice())))
 }
 
 fn basename(path: &str) -> String {
@@ -257,11 +254,14 @@ struct EncodedImg {
 }
 
 fn encode_webp(imag: &image::DynamicImage) -> Result<EncodedImg> {
-    let webp =
-        webp::encode(imag.clone(), webp::Quality::Lossy(WEBP_QUALITY)).context(WebpEncode {})?;
+    let webp = webp::encode(imag.clone(), webp::Quality::Lossy(WEBP_QUALITY)).context(WebpEncode {})?;
     let mut bytes = Vec::new();
     bytes.extend_from_slice(webp.as_slice());
-    Ok(EncodedImg { bytes, mime_type: "image/webp", file_ext: "webp" })
+    Ok(EncodedImg {
+        bytes,
+        mime_type: "image/webp",
+        file_ext: "webp",
+    })
 }
 
 fn encode_png(imag: &image::DynamicImage) -> Result<EncodedImg> {
@@ -289,24 +289,19 @@ fn encode_png(imag: &image::DynamicImage) -> Result<EncodedImg> {
     }
     for color in palette {
         let rgba = rgb::RGBA::new(color.r, color.g, color.b, color.a);
-        state
-            .info_png_mut()
-            .color
-            .palette_add(rgba)
-            .context(PngEncode {})?;
-        state
-            .info_raw_mut()
-            .palette_add(rgba)
-            .context(PngEncode {})?;
+        state.info_png_mut().color.palette_add(rgba).context(PngEncode {})?;
+        state.info_raw_mut().palette_add(rgba).context(PngEncode {})?;
     }
     state.info_png_mut().color.set_bitdepth(8);
     state.info_png_mut().color.colortype = lodepng::ColorType::PALETTE;
     state.info_raw_mut().set_bitdepth(8);
     state.info_raw_mut().colortype = lodepng::ColorType::PALETTE;
-    let bytes = state
-        .encode(&indexed_pixels, width, height)
-        .context(PngEncode {})?;
-    Ok(EncodedImg { bytes, mime_type: "image/png", file_ext: "png" })
+    let bytes = state.encode(&indexed_pixels, width, height).context(PngEncode {})?;
+    Ok(EncodedImg {
+        bytes,
+        mime_type: "image/png",
+        file_ext: "png",
+    })
 }
 
 unsafe extern "C" fn compress_zopfli(
@@ -319,12 +314,7 @@ unsafe extern "C" fn compress_zopfli(
     // Would be nice to use a Write impl for a C buffer but whatever
     let in_slice = slice::from_raw_parts(input as *const _, insize);
     let mut bytes = Vec::new();
-    if let Err(_) = zopfli::compress(
-        &zopfli::Options::default(),
-        &zopfli::Format::Zlib,
-        in_slice,
-        &mut bytes,
-    ) {
+    if let Err(_) = zopfli::compress(&zopfli::Options::default(), &zopfli::Format::Zlib, in_slice, &mut bytes) {
         return 69;
     }
     *outsize = bytes.len();
