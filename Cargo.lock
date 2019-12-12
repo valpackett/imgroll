@@ -773,7 +773,7 @@ version = "0.22.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "byteorder 1.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "jpeg-decoder 0.1.16 (registry+https://github.com/rust-lang/crates.io-index)",
+ "jpeg-decoder 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-iter 0.1.39 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-rational 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-traits 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -791,8 +791,8 @@ dependencies = [
  "failure 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "hex 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "image 0.22.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "lambda_runtime 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "lambda_runtime_errors 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lambda_runtime 0.2.1 (git+https://github.com/phillyfan1138/aws-lambda-rust-runtime)",
+ "lambda_runtime_errors 0.1.1 (git+https://github.com/phillyfan1138/aws-lambda-rust-runtime)",
  "libc 0.2.66 (registry+https://github.com/rust-lang/crates.io-index)",
  "lodepng 2.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -800,7 +800,7 @@ dependencies = [
  "num-rational 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "og-libwebp-sys 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rayon 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "reqwest 0.9.22 (registry+https://github.com/rust-lang/crates.io-index)",
+ "reqwest 0.9.24 (registry+https://github.com/rust-lang/crates.io-index)",
  "rexiv2 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rgb 0.8.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "rusoto_core 0.42.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -811,6 +811,7 @@ dependencies = [
  "simple_logger 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "slug 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "snafu 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "snafu-derive 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tiny-keccak 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "zopfli 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -856,7 +857,7 @@ dependencies = [
 
 [[package]]
 name = "jpeg-decoder"
-version = "0.1.16"
+version = "0.1.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "byteorder 1.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -882,10 +883,10 @@ dependencies = [
 [[package]]
 name = "lambda_runtime"
 version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+source = "git+https://github.com/phillyfan1138/aws-lambda-rust-runtime#b7e5da55d9c55a1a2830bf8cdb6fb86fd8dfab61"
 dependencies = [
  "failure 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "lambda_runtime_core 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lambda_runtime_core 0.1.2 (git+https://github.com/phillyfan1138/aws-lambda-rust-runtime)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.103 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.103 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -896,12 +897,12 @@ dependencies = [
 [[package]]
 name = "lambda_runtime_client"
 version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+source = "git+https://github.com/phillyfan1138/aws-lambda-rust-runtime#b7e5da55d9c55a1a2830bf8cdb6fb86fd8dfab61"
 dependencies = [
  "failure 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "http 0.1.21 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.12.35 (registry+https://github.com/rust-lang/crates.io-index)",
- "lambda_runtime_errors 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lambda_runtime_errors 0.1.1 (git+https://github.com/phillyfan1138/aws-lambda-rust-runtime)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.103 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.103 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -912,14 +913,14 @@ dependencies = [
 [[package]]
 name = "lambda_runtime_core"
 version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+source = "git+https://github.com/phillyfan1138/aws-lambda-rust-runtime#b7e5da55d9c55a1a2830bf8cdb6fb86fd8dfab61"
 dependencies = [
  "backtrace 0.3.40 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.12.35 (registry+https://github.com/rust-lang/crates.io-index)",
- "lambda_runtime_client 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "lambda_runtime_errors 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lambda_runtime_client 0.2.2 (git+https://github.com/phillyfan1138/aws-lambda-rust-runtime)",
+ "lambda_runtime_errors 0.1.1 (git+https://github.com/phillyfan1138/aws-lambda-rust-runtime)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc_version 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.1.22 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -928,10 +929,10 @@ dependencies = [
 [[package]]
 name = "lambda_runtime_errors"
 version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+source = "git+https://github.com/phillyfan1138/aws-lambda-rust-runtime#b7e5da55d9c55a1a2830bf8cdb6fb86fd8dfab61"
 dependencies = [
  "failure 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "lambda_runtime_errors_derive 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lambda_runtime_errors_derive 0.1.1 (git+https://github.com/phillyfan1138/aws-lambda-rust-runtime)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.44 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -939,7 +940,7 @@ dependencies = [
 [[package]]
 name = "lambda_runtime_errors_derive"
 version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+source = "git+https://github.com/phillyfan1138/aws-lambda-rust-runtime#b7e5da55d9c55a1a2830bf8cdb6fb86fd8dfab61"
 dependencies = [
  "proc-macro2 0.4.30 (registry+https://github.com/rust-lang/crates.io-index)",
  "quote 0.6.13 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1490,7 +1491,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "reqwest"
-version = "0.9.22"
+version = "0.9.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "base64 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2598,14 +2599,14 @@ dependencies = [
 "checksum iovec 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "b2b3ea6ff95e175473f8ffe6a7eb7c00d054240321b84c57051175fe3c1e075e"
 "checksum itoa 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)" = "501266b7edd0174f8530248f87f99c88fbe60ca4ef3dd486835b8d8d53136f7f"
 "checksum jobserver 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)" = "f2b1d42ef453b30b7387e113da1c83ab1605d90c5b4e0eb8e96d016ed3b8c160"
-"checksum jpeg-decoder 0.1.16 (registry+https://github.com/rust-lang/crates.io-index)" = "c1aae18ffeeae409c6622c3b6a7ee49792a7e5a062eea1b135fbb74e301792ba"
+"checksum jpeg-decoder 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)" = "0256f0aec7352539102a9efbcb75543227b7ab1117e0f95450023af730128451"
 "checksum js-sys 0.3.32 (registry+https://github.com/rust-lang/crates.io-index)" = "1c840fdb2167497b0bd0db43d6dfe61e91637fa72f9d061f8bd17ddc44ba6414"
 "checksum kernel32-sys 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7507624b29483431c0ba2d82aece8ca6cdba9382bff4ddd0f7490560c056098d"
-"checksum lambda_runtime 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "077b8819fe6998266342efdc5154192551143f390ab758007cc7421992e61b07"
-"checksum lambda_runtime_client 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "f5e64758b587f1d07b6ca4814a3bc0f3db48c89cc3c895db43a23c690855b370"
-"checksum lambda_runtime_core 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "da1cb59e060c1068cfa386b58c202a4381c509ace85a1eadab505164f0563ca5"
-"checksum lambda_runtime_errors 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "93b63ea3688df164aaa5643c5f3291cc481366d624729deb3c4dc85ee65ac20a"
-"checksum lambda_runtime_errors_derive 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "38fa619ec6f1ee2371a109683d251035c83f01b8ffc10f4aa46de821836a7baf"
+"checksum lambda_runtime 0.2.1 (git+https://github.com/phillyfan1138/aws-lambda-rust-runtime)" = "<none>"
+"checksum lambda_runtime_client 0.2.2 (git+https://github.com/phillyfan1138/aws-lambda-rust-runtime)" = "<none>"
+"checksum lambda_runtime_core 0.1.2 (git+https://github.com/phillyfan1138/aws-lambda-rust-runtime)" = "<none>"
+"checksum lambda_runtime_errors 0.1.1 (git+https://github.com/phillyfan1138/aws-lambda-rust-runtime)" = "<none>"
+"checksum lambda_runtime_errors_derive 0.1.1 (git+https://github.com/phillyfan1138/aws-lambda-rust-runtime)" = "<none>"
 "checksum lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 "checksum libc 0.2.66 (registry+https://github.com/rust-lang/crates.io-index)" = "d515b1f41455adea1313a4a2ac8a8a477634fbae63cc6100e3aebb207ce61558"
 "checksum libloading 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "f2b111a074963af1d37a139918ac6d49ad1d0d5e47f72fd55388619691a7d753"
@@ -2669,7 +2670,7 @@ dependencies = [
 "checksum redox_users 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "4ecedbca3bf205f8d8f5c2b44d83cd0690e39ee84b951ed649e9f1841132b66d"
 "checksum regex 1.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "dc220bd33bdce8f093101afe22a037b8eb0e5af33592e6a9caafff0d4cb81cbd"
 "checksum regex-syntax 0.6.12 (registry+https://github.com/rust-lang/crates.io-index)" = "11a7e20d1cce64ef2fed88b66d347f88bd9babb82845b2b858f3edbf59a4f716"
-"checksum reqwest 0.9.22 (registry+https://github.com/rust-lang/crates.io-index)" = "2c2064233e442ce85c77231ebd67d9eca395207dec2127fe0bbedde4bd29a650"
+"checksum reqwest 0.9.24 (registry+https://github.com/rust-lang/crates.io-index)" = "f88643aea3c1343c804950d7bf983bd2067f5ab59db6d613a08e05572f2714ab"
 "checksum rexiv2 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "982534bb5ab05ec02973487cb3338392dc68fdc8e189fdcf268ef8c95a78cfa8"
 "checksum rgb 0.8.14 (registry+https://github.com/rust-lang/crates.io-index)" = "2089e4031214d129e201f8c3c8c2fe97cd7322478a0d1cdf78e7029b0042efdb"
 "checksum ring 0.16.9 (registry+https://github.com/rust-lang/crates.io-index)" = "6747f8da1f2b1fabbee1aaa4eb8a11abf9adef0bf58a41cee45db5d59cecdfac"
