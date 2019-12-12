@@ -107,7 +107,7 @@ pub fn process_photo(file_contents: &[u8], file_name: &str) -> Result<(Photo, Ve
     let lossless = format_is_lossless(&exivfmt);
 
     // Always constrain the size of the main processed image
-    let (imag, width) = if !lossless && (width > 3000 || height > 3000) {
+    let (imag, main_width) = if !lossless && (width > 3000 || height > 3000) {
         let i = imag.resize(3000, 3000, image::FilterType::Lanczos3);
         let w = i.width();
         (i, w)
@@ -120,7 +120,7 @@ pub fn process_photo(file_contents: &[u8], file_name: &str) -> Result<(Photo, Ve
         .par_iter()
         .map(|encoder| {
             let main_result = encoder(&imag)?;
-            let main_filename = format!("{}.{}.{}", file_prefix, width, main_result.file_ext);
+            let main_filename = format!("{}.{}.{}", file_prefix, main_width, main_result.file_ext);
             let mut files = vec![];
             files.push(OutFile {
                 name: main_filename.clone(),
@@ -129,7 +129,7 @@ pub fn process_photo(file_contents: &[u8], file_name: &str) -> Result<(Photo, Ve
             });
             let mut srcset = vec![SrcSetEntry {
                 src: main_filename,
-                width,
+                width: main_width,
             }];
 
             let mimetype = main_result.mime_type.to_owned();
