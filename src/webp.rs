@@ -63,10 +63,10 @@ pub fn encode(imag: image::DynamicImage, quality: Quality) -> Result<WebPOinter>
             (image::ColorType::RGBA(8), Lossy(q)) => WebPEncodeRGBA(&samp.as_slice()[0], w, h, s, q, &mut result.ptr),
             (image::ColorType::RGB(8), Lossless) => {
                 WebPEncodeLosslessRGB(&samp.as_slice()[0], w, h, s, &mut result.ptr)
-            }
+            },
             (image::ColorType::RGBA(8), Lossless) => {
                 WebPEncodeLosslessRGBA(&samp.as_slice()[0], w, h, s, &mut result.ptr)
-            }
+            },
             (f, _) => return Err(Error::UnsupportedColor { format: f }),
         }
     };

@@ -26,7 +26,7 @@ fn main() -> Result<()> {
                 stdin.read_to_end(&mut buf).context(InputOutput {})?;
             }
             output(imgroll::process_photo(&buf, "stdin").context(Image {})?)?;
-        }
+        },
         paths => {
             for path in paths {
                 let mut file = fs::File::open(path).context(InputOutput {})?;
@@ -34,7 +34,7 @@ fn main() -> Result<()> {
                 file.read_to_end(&mut buf).context(InputOutput {})?;
                 output(imgroll::process_photo(&buf, path).context(Image {})?)?;
             }
-        }
+        },
     }
 
     Ok(())
