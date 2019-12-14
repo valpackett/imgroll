@@ -84,12 +84,16 @@ fn handle_event(event: Value, _ctx: lambda::Context) -> Result<(), HandlerError>
         let (mut photo, files) = imgroll::process_photo(&buf, &key).context(Image {})?;
         for src in &mut photo.source {
             for mut srcset in &mut src.srcset {
-                srcset.src = format!(
-                    "https://{}.s3.dualstack.{}.amazonaws.com/{}",
-                    &bucket,
-                    region.name(),
-                    srcset.src
-                );
+                srcset.src = if let Ok(host) = std::env::var("BUCKET_PUBLIC_HOST") {
+                    format!("{}/{}", host, srcset.src)
+                } else {
+                    format!(
+                        "https://{}.s3.dualstack.{}.amazonaws.com/{}",
+                        &bucket,
+                        region.name(),
+                        srcset.src
+                    )
+                };
             }
         }
         info!("Processed photo, metadata: {:?}", &photo);
