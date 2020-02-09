@@ -87,7 +87,8 @@ pub fn process_photo(file_contents: &[u8], file_name: &str) -> Result<(Photo, Ve
         image::load_from_memory_with_format(&file_contents, format_exiv2image(&exivfmt)?).context(ImageProc {})?,
         meta.get_orientation(),
     );
-    let palette = color_thief::get_palette(&imag.raw_pixels(), colortype_image2thief(imag.color())?, 10, 10)
+    let samp = samples(&imag)?;
+    let palette = color_thief::get_palette(samp.as_slice(), colortype_image2thief(imag.color())?, 10, 10)
         .context(PaletteExtract {})?;
     let (width, height) = imag.dimensions();
 
@@ -96,7 +97,7 @@ pub fn process_photo(file_contents: &[u8], file_name: &str) -> Result<(Photo, Ve
         {
             use tiny_keccak::Hasher;
             let mut hasher = tiny_keccak::ParallelHash::v128(&[], 8192);
-            hasher.update(&imag.raw_pixels());
+            hasher.update(&samp.as_slice());
             let mut buf = [0u8; 16];
             hasher.finalize(&mut buf);
             hex::encode(&buf[0..6])
@@ -108,7 +109,7 @@ pub fn process_photo(file_contents: &[u8], file_name: &str) -> Result<(Photo, Ve
 
     // Always constrain the size of the main processed image
     let (imag, main_width) = if !lossless && (width > 3000 || height > 3000) {
-        let i = imag.resize(3000, 3000, image::FilterType::Lanczos3);
+        let i = imag.resize(3000, 3000, image::imageops::FilterType::Lanczos3);
         let w = i.width();
         (i, w)
     } else {
@@ -134,7 +135,7 @@ pub fn process_photo(file_contents: &[u8], file_name: &str) -> Result<(Photo, Ve
 
             let mimetype = main_result.mime_type.to_owned();
             let mut make_thumbnail = |size| {
-                let thumb = imag.resize(size, size, image::FilterType::Lanczos3);
+                let thumb = imag.resize(size, size, image::imageops::FilterType::Lanczos3);
                 let result = encoder(&thumb)?;
                 let filename = format!("{}.{}.{}", file_prefix, thumb.width(), result.file_ext);
                 files.push(OutFile {
@@ -208,8 +209,8 @@ pub fn process_photo(file_contents: &[u8], file_name: &str) -> Result<(Photo, Ve
 
 fn format_exiv2image(mt: &rexiv2::MediaType) -> Result<image::ImageFormat> {
     match mt {
-        rexiv2::MediaType::Jpeg => Ok(image::ImageFormat::JPEG),
-        rexiv2::MediaType::Png => Ok(image::ImageFormat::PNG),
+        rexiv2::MediaType::Jpeg => Ok(image::ImageFormat::Jpeg),
+        rexiv2::MediaType::Png => Ok(image::ImageFormat::Png),
         f => Err(Error::UnsupportedFormat { format: f.clone() }),
     }
 }
@@ -253,16 +254,24 @@ fn orient_image(imag: image::DynamicImage, ori: rexiv2::Orientation) -> image::D
 
 fn colortype_image2thief(t: image::ColorType) -> Result<color_thief::ColorFormat> {
     match t {
-        image::ColorType::RGB(8) => Ok(color_thief::ColorFormat::Rgb),
-        image::ColorType::RGBA(8) => Ok(color_thief::ColorFormat::Rgba),
+        image::ColorType::Rgb8 => Ok(color_thief::ColorFormat::Rgb),
+        image::ColorType::Rgba8 => Ok(color_thief::ColorFormat::Rgba),
         f => Err(Error::UnsupportedColor { format: f }),
     }
 }
 
 pub fn make_tiny_preview(imag: &image::DynamicImage) -> Result<String> {
-    let thumb = imag.resize(48, 48, image::FilterType::Gaussian);
+    let thumb = imag.resize(48, 48, image::imageops::FilterType::Gaussian);
     let webp = webp::encode(thumb, webp::Quality::Lossy(0.2)).context(WebpEncode {})?;
     Ok(format!("data:image/webp;base64,{}", base64::encode(webp.as_slice())))
+}
+
+fn samples(imag: &image::DynamicImage) -> Result<image::FlatSamples<Vec<u8>>> {
+    Ok(match imag.color() {
+        image::ColorType::Rgb8 => imag.to_rgb().into_flat_samples(),
+        image::ColorType::Rgba8 => imag.to_rgba().into_flat_samples(),
+        f => return Err(Error::UnsupportedColor { format: f }),
+    })
 }
 
 fn basename(path: &str) -> String {
@@ -307,8 +316,8 @@ fn encode_webp(imag: &image::DynamicImage) -> Result<EncodedImg> {
 fn encode_jpeg(imag: &image::DynamicImage) -> Result<EncodedImg> {
     use image::GenericImageView;
     let mut jpeg = mozjpeg::Compress::new(match imag.color() {
-        image::ColorType::RGB(8) => mozjpeg::ColorSpace::JCS_RGB,
-        image::ColorType::RGBA(8) => mozjpeg::ColorSpace::JCS_EXT_RGBA,
+        image::ColorType::Rgb8 => mozjpeg::ColorSpace::JCS_RGB,
+        image::ColorType::Rgba8 => mozjpeg::ColorSpace::JCS_EXT_RGBA,
         f => return Err(Error::UnsupportedColor { format: f }),
     });
     jpeg.set_scan_optimization_mode(mozjpeg::ScanMode::AllComponentsTogether);
@@ -317,11 +326,7 @@ fn encode_jpeg(imag: &image::DynamicImage) -> Result<EncodedImg> {
     jpeg.set_mem_dest();
 
     jpeg.start_compress();
-    let samp = match imag.color() {
-        image::ColorType::RGB(8) => imag.to_rgb().into_flat_samples(),
-        image::ColorType::RGBA(8) => imag.to_rgba().into_flat_samples(),
-        f => return Err(Error::UnsupportedColor { format: f }),
-    };
+    let samp = samples(imag)?;
     jpeg.write_scanlines(&samp.as_slice());
     jpeg.finish_compress();
 

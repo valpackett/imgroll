@@ -44,8 +44,8 @@ pub fn encode(imag: image::DynamicImage, quality: Quality) -> Result<WebPOinter>
     use image::GenericImageView;
     use Quality::*;
     let samp = match imag.color() {
-        image::ColorType::RGB(8) => imag.to_rgb().into_flat_samples(),
-        image::ColorType::RGBA(8) => imag.to_rgba().into_flat_samples(),
+        image::ColorType::Rgb8 => imag.to_rgb().into_flat_samples(),
+        image::ColorType::Rgba8 => imag.to_rgba().into_flat_samples(),
         f => return Err(Error::UnsupportedColor { format: f }),
     };
     let (width, height) = imag.dimensions();
@@ -59,12 +59,12 @@ pub fn encode(imag: image::DynamicImage, quality: Quality) -> Result<WebPOinter>
     let s = rowstride.try_into().context(ConvertSigned {})?;
     let ret = unsafe {
         match (imag.color(), quality) {
-            (image::ColorType::RGB(8), Lossy(q)) => WebPEncodeRGB(&samp.as_slice()[0], w, h, s, q, &mut result.ptr),
-            (image::ColorType::RGBA(8), Lossy(q)) => WebPEncodeRGBA(&samp.as_slice()[0], w, h, s, q, &mut result.ptr),
-            (image::ColorType::RGB(8), Lossless) => {
+            (image::ColorType::Rgb8, Lossy(q)) => WebPEncodeRGB(&samp.as_slice()[0], w, h, s, q, &mut result.ptr),
+            (image::ColorType::Rgba8, Lossy(q)) => WebPEncodeRGBA(&samp.as_slice()[0], w, h, s, q, &mut result.ptr),
+            (image::ColorType::Rgb8, Lossless) => {
                 WebPEncodeLosslessRGB(&samp.as_slice()[0], w, h, s, &mut result.ptr)
             },
-            (image::ColorType::RGBA(8), Lossless) => {
+            (image::ColorType::Rgba8, Lossless) => {
                 WebPEncodeLosslessRGBA(&samp.as_slice()[0], w, h, s, &mut result.ptr)
             },
             (f, _) => return Err(Error::UnsupportedColor { format: f }),

@@ -23,7 +23,7 @@ base64 = "0"
 hex = "0.4"
 tiny-keccak = { version = "2", features = ["parallel_hash"] }
 slug = "0.1"
-image = { version = "0.22", default-features = false, features = ["png_codec", "jpeg"] }
+image = { version = "0.23", default-features = false, features = ["png", "jpeg"] }
 rexiv2 = "0.9"
 color-thief = { git = "https://github.com/RazrFalcon/color-thief-rs" } # error trait
 exoquant = "0.2"
