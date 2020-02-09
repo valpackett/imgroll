@@ -6,8 +6,7 @@ use serde_json::Value;
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::convert::TryInto;
-use std::io::Read;
-use tokio;
+use tokio::{self, io::AsyncReadExt};
 
 #[derive(Debug, Snafu)]
 pub enum Error {
@@ -87,8 +86,9 @@ async fn func(event: Value) -> Result<Value, Error> {
         let mut buf = Vec::new();
         obj.body
             .ok_or("body")?
-            .into_blocking_read()
+            .into_async_read()
             .read_to_end(&mut buf)
+            .await
             .context(InputOutput {})?;
         let (mut photo, files) = imgroll::process_photo(&buf, &key).context(Image {})?;
         for src in &mut photo.source {
