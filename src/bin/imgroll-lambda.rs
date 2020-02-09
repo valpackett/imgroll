@@ -1,5 +1,4 @@
 use aws_lambda_events::event::s3::S3Event;
-use lambda_runtime::{self as lambda, error::HandlerError, lambda};
 use log::info;
 use rusoto_core::{Region, RusotoError};
 use rusoto_s3::{GetObjectError, GetObjectRequest, PutObjectError, PutObjectRequest, S3Client, StreamingBody, S3};
@@ -8,11 +7,15 @@ use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::io::Read;
+use tokio;
 
-#[derive(Debug, Snafu, lambda_runtime_errors::LambdaErrorExt)]
+#[derive(Debug, Snafu)]
 pub enum Error {
     #[snafu(display("I/O error: {}", source))]
     InputOutput { source: std::io::Error },
+
+    #[snafu(display("Logging init error: {}", source))]
+    SetLogger { source: log::SetLoggerError },
 
     #[snafu(display("Number conversion error: {}", source))]
     FromInt { source: std::num::TryFromIntError },
@@ -36,22 +39,28 @@ pub enum Error {
 
     #[snafu(display("Unable to process: {}", source))]
     Image { source: imgroll::Error },
+
+    #[snafu(display("Some error: {}", info))]
+    WTF { info: String },
 }
 
-impl From<Error> for HandlerError {
-    fn from(e: Error) -> Self {
-        HandlerError::new(e)
+impl From<&str> for Error {
+    fn from(e: &str) -> Self {
+        Error::WTF { info: e.to_owned() }
     }
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    simple_logger::init_with_level(log::Level::Info)?;
-    lambda!(handle_event);
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
+    let func = lambda::handler_fn(func);
+    lambda::run(func).await?;
     Ok(())
 }
 
-fn handle_event(event: Value, _ctx: lambda::Context) -> Result<(), HandlerError> {
-    let s3_event: S3Event = serde_json::from_value(event)?;
+async fn func(event: Value) -> Result<Value, Error> {
+    simple_logger::init_with_level(log::Level::Info).context(SetLogger {})?;
+
+    let s3_event: S3Event = serde_json::from_value(event.clone()).context(JsonEnc {})?;
 
     for record in s3_event.records {
         let region: Region = record.aws_region.ok_or("region")?.parse().context(AwsRegion {})?;
@@ -70,7 +79,7 @@ fn handle_event(event: Value, _ctx: lambda::Context) -> Result<(), HandlerError>
                 key: key.clone(),
                 ..Default::default()
             })
-            .sync()
+            .await
             .context(S3Get {})?;
         let meta = obj.metadata.ok_or("metadata")?;
         let cb_url = meta.get("imgroll-cb").ok_or("callback")?;
@@ -113,7 +122,7 @@ fn handle_event(event: Value, _ctx: lambda::Context) -> Result<(), HandlerError>
                 body: Some(StreamingBody::from(bytes)),
                 ..Default::default()
             })
-            .sync()
+            .await
             .context(S3Put {})?;
         }
         info!("Sending callback request");
@@ -123,9 +132,10 @@ fn handle_event(event: Value, _ctx: lambda::Context) -> Result<(), HandlerError>
             .header(reqwest::header::CONTENT_TYPE, "application/json")
             .body(json)
             .send()
+            .await
             .context(CbReq {})?;
         info!("Callback response: {:?}", &resp);
     }
 
-    Ok(())
+    Ok(event)
 }
