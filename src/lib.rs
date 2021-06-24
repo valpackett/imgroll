@@ -1,7 +1,7 @@
 mod webp;
 
 use snafu::{ResultExt, Snafu};
-use std::{convert::TryInto, ptr, slice};
+use std::{convert::TryInto, ptr};
 
 const PNG_QUANTIZE_COLORS: usize = 69;
 const WEBP_QUALITY: f32 = 53.0;
@@ -268,8 +268,8 @@ pub fn make_tiny_preview(imag: &image::DynamicImage) -> Result<String> {
 
 fn samples(imag: &image::DynamicImage) -> Result<image::FlatSamples<Vec<u8>>> {
     Ok(match imag.color() {
-        image::ColorType::Rgb8 => imag.to_rgb().into_flat_samples(),
-        image::ColorType::Rgba8 => imag.to_rgba().into_flat_samples(),
+        image::ColorType::Rgb8 => imag.to_rgb8().into_flat_samples(),
+        image::ColorType::Rgba8 => imag.to_rgba8().into_flat_samples(),
         f => return Err(Error::UnsupportedColor { format: f }),
     })
 }
@@ -359,9 +359,7 @@ fn encode_png(imag: &image::DynamicImage) -> Result<EncodedImg> {
         &ditherer::FloydSteinberg::checkered(),
     );
     let mut state = lodepng::State::new();
-    unsafe {
-        state.set_custom_zlib(Some(compress_zopfli), ptr::null());
-    }
+    state.set_custom_zlib(Some(compress_zopfli), ptr::null());
     for color in palette {
         let rgba = rgb::RGBA::new(color.r, color.g, color.b, color.a);
         state.info_png_mut().color.palette_add(rgba).context(PngEncode {})?;
@@ -379,22 +377,13 @@ fn encode_png(imag: &image::DynamicImage) -> Result<EncodedImg> {
     })
 }
 
-unsafe extern "C" fn compress_zopfli(
-    result: &mut *mut libc::c_uchar,
-    outsize: &mut usize,
-    input: *const libc::c_uchar,
-    insize: usize,
-    _settings: *const lodepng::CompressSettings,
-) -> libc::c_uint {
-    // Would be nice to use a Write impl for a C buffer but whatever
-    let in_slice = slice::from_raw_parts(input as *const _, insize);
+fn compress_zopfli(
+    input: &[u8], output: &mut dyn std::io::Write, _context: &lodepng::CompressSettings
+) -> Result<(), lodepng::Error> {
     let mut bytes = Vec::new();
-    if let Err(_) = zopfli::compress(&zopfli::Options::default(), &zopfli::Format::Zlib, in_slice, &mut bytes) {
-        return 69;
+    if let Err(_) = zopfli::compress(&zopfli::Options::default(), &zopfli::Format::Zlib, input, &mut bytes) {
+        return Err(lodepng::Error::new(0));
     }
-    *outsize = bytes.len();
-    *result = libc::malloc(*outsize) as *mut _;
-    let out_slice = slice::from_raw_parts_mut(*result, *outsize);
-    out_slice.copy_from_slice(&bytes);
-    0
+    output.write_all(&bytes)?;
+    Ok(())
 }

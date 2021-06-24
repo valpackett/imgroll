@@ -44,8 +44,8 @@ pub fn encode(imag: image::DynamicImage, quality: Quality) -> Result<WebPOinter>
     use image::GenericImageView;
     use Quality::*;
     let samp = match imag.color() {
-        image::ColorType::Rgb8 => imag.to_rgb().into_flat_samples(),
-        image::ColorType::Rgba8 => imag.to_rgba().into_flat_samples(),
+        image::ColorType::Rgb8 => imag.to_rgb8().into_flat_samples(),
+        image::ColorType::Rgba8 => imag.to_rgba8().into_flat_samples(),
         f => return Err(Error::UnsupportedColor { format: f }),
     };
     let (width, height) = imag.dimensions();
