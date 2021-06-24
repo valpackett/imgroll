@@ -9,22 +9,25 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    container: centos:7
-    # amazonlinux's gexiv2 package is broken as of december 2019!!
-    # and the official rust builds from rustup have a weird build error on older distros (glibcs?)
+    container: amazonlinux:2
     steps:
-    - run: yum install -y epel-release && yum install -y git gcc binutils clang cmake3 make zip rust cargo libgexiv2-devel
+    - run: yum install -y git gcc binutils clang cmake3 make zip tar libgexiv2-devel
     - run: ln -s cmake3 /usr/bin/cmake
     - uses: actions/checkout@v1
     - uses: actions/cache@v1
       with:
-        path: ~/.cargo/registry
-        key: imgroll-cargo-registry
-    - uses: actions/cache@v1
+        path: |
+          ~/.cargo/registry
+          target
+        key: cargo-${{ hashFiles('Cargo.toml') }}
+    - uses: actions-rs/toolchain@v1
       with:
-        path: target
-        key: imgroll-cargo-target
-    - run: cargo build --verbose --release --bin imgroll-lambda
+        toolchain: stable
+        override: true
+    - uses: actions-rs/cargo@v1
+      with:
+        command: build
+        args: --verbose --release --bin imgroll-lambda
     - run: ldd -v target/release/imgroll-lambda
     - run: mkdir -p lambda/lib && cp target/release/imgroll-lambda lambda/bootstrap && cp /usr/lib*/*exiv2*so.* /usr/lib*/libgobject*so.* /usr/lib*/libglib*so.* /usr/lib*/libgio*so.* lambda/lib/
     - run: (cd lambda && zip -y -r ../lambda.zip *)
