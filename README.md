@@ -3,7 +3,7 @@
 A smart image optimization library / local executable / AWS Lambda function.
 Primarily designed for [sweetroll2].
 
-[sweetroll2]: https://github.com/myfreeweb/sweetroll2
+[sweetroll2]: https://github.com/unrelentingtech/sweetroll2
 
 - Extracts some useful metadata using exiv2
 - Applies rotation specified in metadata
@@ -133,6 +133,6 @@ And here's the kind of HTML sweetroll2 can generate from that:
 ## License
 
 This is free and unencumbered software released into the public domain.  
-For more information, please refer to the `UNLICENSE` file or [unlicense.org](http://unlicense.org).
+For more information, please refer to the `UNLICENSE` file or [unlicense.org](https://unlicense.org).
 
 (Note: different licenses apply to dependencies.)

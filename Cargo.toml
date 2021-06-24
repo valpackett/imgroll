@@ -6,8 +6,8 @@ keywords = ["Image", "Picture", "Photo"]
 description = "Image processor for web publishing (made for sweetroll2)"
 license = "Unlicense"
 readme = "README.md"
-homepage = "https://github.com/myfreeweb/imgroll"
-repository = "https://github.com/myfreeweb/imgroll"
+homepage = "https://github.com/unrelentingtech/imgroll"
+repository = "https://github.com/unrelentingtech/imgroll"
 edition = "2018"
 
 [dependencies]
