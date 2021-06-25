@@ -51,14 +51,13 @@ impl From<&str> for Error {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
+    simple_logger::init_with_level(log::Level::Info).context(SetLogger {})?;
     let func = lambda_runtime::handler_fn(func);
     lambda_runtime::run(func).await?;
     Ok(())
 }
 
 async fn func(event: Value, _: lambda_runtime::Context) -> Result<Value, Error> {
-    simple_logger::init_with_level(log::Level::Info).context(SetLogger {})?;
-
     let s3_event: S3Event = serde_json::from_value(event.clone()).context(JsonEnc {})?;
 
     for record in s3_event.records {
