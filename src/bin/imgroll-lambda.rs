@@ -118,6 +118,7 @@ async fn func(event: Value, _: lambda_runtime::Context) -> Result<Value, Error> 
                 content_length: Some(bytes.len().try_into().context(FromInt {})?),
                 content_type: Some(mimetype),
                 content_disposition: Some("inline".to_owned()),
+                cache_control: Some("public, max-age=31536000, immutable".to_owned()),
                 body: Some(StreamingBody::from(bytes)),
                 ..Default::default()
             })
